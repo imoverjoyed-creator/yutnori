@@ -14,7 +14,11 @@
 .startTag{position:absolute;left:86%;top:84%;transform:translate(-50%,-50%);z-index:5;background:#ffd45f;border:2px solid #795135;border-radius:10px;padding:3px 7px;font-size:12px;font-weight:900}
 .piece{position:absolute;width:28px;height:28px;border-radius:50%;border:3px solid white;box-shadow:0 2px 5px #654;transform:translate(-50%,-50%);z-index:4;font-weight:900;color:#fff;font-size:11px}.red{background:#d92525}.blue{background:#0967c9}.piece.sel{outline:4px solid #ffcb36;cursor:pointer;transform:translate(-50%,-50%) scale(1.12)}
 .tray{background:#fff9eb;border-radius:20px;padding:15px;text-align:center}.sticks{display:flex;justify-content:center;gap:10px;height:92px;align-items:center}
-.stick{position:relative;width:35px;height:82px;border-radius:19px;background:linear-gradient(90deg,#c78a47,#8b4f25);border:3px solid #70431f;box-shadow:inset 8px 0 0 #dda25b;transition:.3s}
+.stick{position:relative;width:38px;height:82px;border-radius:4px 20px 20px 4px;
+background:linear-gradient(90deg,#9a5a2d 0 10%,#c98743 11% 45%,#9a5529 78%,#6f3d1f 100%);
+border:3px solid #70431f;border-left:5px solid #5d351e;
+box-shadow:inset 7px 0 0 rgba(255,190,103,.45),inset -6px 0 8px rgba(73,34,13,.22);
+transition:.3s}
 .stick.convex::after{content:"×\A×";white-space:pre;position:absolute;inset:0;display:grid;place-items:center;text-align:center;font-size:22px;line-height:23px;font-weight:900;color:#4d2b18}
 .stick.special.convex::after{content:"×\A★";color:#b3261e}
 .stick.toss{transform:translateY(-22px) rotate(15deg)}
@@ -26,7 +30,7 @@
 <div class="title">🪵 우리집 윷놀이</div>
 <div class="modes"><button id="aiMode" class="mode on">1인전</button><button id="twoMode" class="mode">2인전</button></div>
 <div class="teams"><div id="t0" class="team turn">🔴 우리팀<br><span id="d0">도착 0 / 4</span></div><div id="t1" class="team">🔵 상대팀 🤖<br><span id="d1">도착 0 / 4</span></div></div>
-<div id="board" class="board"></div>
+<div id="turnBanner" class="turnBanner">🔴 우리팀 차례</div><div id="board" class="board"></div>
 <div class="tray">
 <div class="sticks"><i class="stick special"></i><i class="stick"></i><i class="stick"></i><i class="stick"></i></div>
 <div id="result" class="result">시작!</div>
@@ -56,9 +60,60 @@ function route(p){return p.route==='r4'?r4:p.route==='r8'?r8:main}
 function pos(p){if(p.idx<0)return C[0];if(p.done)return [50,50];return C[route(p)[p.idx]]}
 function advance(p,n){if(p.idx<0){p.idx=0;p.route='main'}for(let z=0;z<n;z++){let r=route(p),node=r[p.idx];if(node===4&&p.route==='main')p.route='r4';else if(node===8&&p.route==='main')p.route='r8';r=route(p);p.idx++;if(p.idx>=r.length-1){p.done=true;return}}}
 function retreat(p){if(p.idx<0||p.done)return;if(p.idx===0){p.idx=-1;p.route='main'}else p.idx--}
-function render(){document.querySelectorAll('.piece').forEach(x=>x.remove());for(let t=0;t<2;t++)S.p[t].forEach((p,i)=>{if(p.done)return;let [x,y]=pos(p),b=document.createElement('button');b.className='piece '+(t?'blue':'red');b.textContent=i+1;b.style.left=(x+(p.idx<0?(i%2)*4-2:0))+'%';b.style.top=(y+(p.idx<0?Math.floor(i/2)*4-2:0))+'%';if(S.n!==null&&t===S.turn&&(!ai||t===0)&&!(S.n===-1&&p.idx<0)){b.classList.add('sel');b.onclick=()=>move(t,i)}elBoard.appendChild(b)});elD0.textContent='도착 '+S.p[0].filter(x=>x.done).length+' / 4';elD1.textContent='도착 '+S.p[1].filter(x=>x.done).length+' / 4';elT0.classList.toggle('turn',S.turn===0);elT1.classList.toggle('turn',S.turn===1)}
+function render(){
+ document.querySelectorAll('.piece').forEach(x=>x.remove());
+ for(let t=0;t<2;t++){
+  let firstWaiting=S.p[t].findIndex(p=>!p.done&&p.idx<0);
+  S.p[t].forEach((p,i)=>{
+   if(p.done)return;
+   let x,y;
+   if(p.idx<0){x=60+i*8;y=t?5:95}
+   else{
+    [x,y]=pos(p);
+    let same=0;
+    for(let j=0;j<i;j++){let q=S.p[t][j];if(!q.done&&q.idx>=0&&route(q)[q.idx]===route(p)[p.idx])same++}
+    x+=same*1.35;y-=same*1.35;
+   }
+   let bt=document.createElement('button');
+   bt.className='piece '+(t?'blue':'red');bt.textContent=i+1;
+   bt.style.left=x+'%';bt.style.top=y+'%';
+   let can=S.n!==null&&t===S.turn&&(!ai||t===0)&&!(S.n===-1&&p.idx<0)&&(p.idx>=0||i===firstWaiting);
+   if(can){bt.classList.add('sel');bt.onclick=()=>move(t,i)}
+   elBoard.appendChild(bt);
+  });
+ }
+ elD0.textContent='도착 '+S.p[0].filter(x=>x.done).length+' / 4';
+ elD1.textContent='도착 '+S.p[1].filter(x=>x.done).length+' / 4';
+ elT0.classList.toggle('turn',S.turn===0);elT1.classList.toggle('turn',S.turn===1);
+ let tb=document.getElementById('turnBanner');
+ if(tb){
+  if(S.turn===0){tb.textContent='🔴 우리팀 차례';tb.style.background='#ffe7aa';tb.style.borderColor='#e9a514';tb.style.color='#4b2a16'}
+  else{tb.textContent='🔵 상대팀 차례';tb.style.background='#dcecff';tb.style.borderColor='#1875d1';tb.style.color='#123d6a'}
+ }
+}
 function finishTurn(caught){if(S.p[S.turn].every(x=>x.done)){S.over=true;elResult.textContent=(S.turn?'상대팀':'우리팀')+' 승리!';elMsg.textContent='윷 던지기를 누르면 새 게임';elThrow.disabled=false;return}if(S.extra||caught){S.n=null;S.extra=false;elThrow.disabled=false;elMsg.textContent='한 번 더 던지세요!'}else{S.n=null;S.turn=1-S.turn;elThrow.disabled=false;elMsg.textContent=(S.turn?'상대팀':'우리팀')+' 차례입니다.';if(ai&&S.turn===1)setTimeout(throwYut,600)}render()}
-function move(t,id){if(S.n===null||t!==S.turn)return;let p=S.p[t][id],n=S.n;if(n===-1)retreat(p);else advance(p,n);let caught=false;if(!p.done&&p.idx>=0){let node=route(p)[p.idx];S.p[1-t].forEach(q=>{if(!q.done&&q.idx>=0&&route(q)[q.idx]===node){q.idx=-1;q.route='main';caught=true}})}finishTurn(caught)}
+function move(t,id){
+ if(S.n===null||t!==S.turn)return;
+ let p=S.p[t][id],n=S.n;
+ if(p.idx<0){
+  let first=S.p[t].findIndex(q=>!q.done&&q.idx<0);
+  if(id!==first)return;
+ }
+ let carried=[];
+ if(p.idx>=0){
+  let startNode=route(p)[p.idx];
+  carried=S.p[t].filter(q=>!q.done&&q.idx>=0&&route(q)[q.idx]===startNode);
+ }else carried=[p];
+ carried.forEach(q=>{if(n===-1)retreat(q);else advance(q,n)});
+ let caught=false;
+ if(!p.done&&p.idx>=0){
+  let node=route(p)[p.idx];
+  S.p[1-t].forEach(q=>{
+   if(!q.done&&q.idx>=0&&route(q)[q.idx]===node){q.idx=-1;q.route='main';caught=true}
+  });
+ }
+ finishTurn(caught)
+}
 function throwYut(){if(S.n!==null||S.over){if(S.over)reset();return}elThrow.disabled=true;let sticks=[...document.querySelectorAll('.stick')];sticks.forEach(x=>x.classList.add('toss'));setTimeout(()=>{let convex=sticks.map(()=>Math.random()<.5);sticks.forEach((x,i)=>{x.classList.remove('toss');x.classList.toggle('convex',convex[i])});let flat=convex.filter(x=>!x).length;let backdo=(flat===1 && !convex[0]);let n=backdo?-1:(flat===0?5:flat),names={[-1]:'백도',1:'도',2:'개',3:'걸',4:'윷',5:'모'};S.n=n;S.extra=n>=4;elResult.textContent=names[n]+'! '+(n>0?'+'+n:'-1');let movable=S.p[S.turn].some(p=>!p.done&&!(n===-1&&p.idx<0));if(!movable){S.n=null;S.extra=false;S.turn=1-S.turn;elThrow.disabled=false;elMsg.textContent='백도로 움직일 말이 없어 차례가 넘어갑니다.';render();if(ai&&S.turn===1)setTimeout(throwYut,600);return}if(ai&&S.turn===1){elMsg.textContent='상대팀이 생각 중...';setTimeout(aiMove,550)}else{elMsg.textContent='노란 테두리가 있는 말을 눌러주세요.';render()}},450)}
 function aiMove(){let a=S.p[1].filter(p=>!p.done&&!(S.n===-1&&p.idx<0));let p=a[Math.floor(Math.random()*a.length)];move(1,p.id)}
 elThrow.onclick=throwYut;
