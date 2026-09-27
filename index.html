@@ -64,21 +64,28 @@ function render(){
  document.querySelectorAll('.piece').forEach(x=>x.remove());
  for(let t=0;t<2;t++){
   let firstWaiting=S.p[t].findIndex(p=>!p.done&&p.idx<0);
+  let drawn=new Set();
   S.p[t].forEach((p,i)=>{
    if(p.done)return;
-   let x,y;
-   if(p.idx<0){x=60+i*8;y=t?5:95}
-   else{
+   let x,y,label=String(i+1),moveId=i;
+   if(p.idx<0){
+    x=60+i*8;y=t?5:95;
+   }else{
+    let node=route(p)[p.idx];
+    let group=S.p[t].map((q,j)=>({q,j})).filter(o=>!o.q.done&&o.q.idx>=0&&route(o.q)[o.q.idx]===node);
+    let key=t+':'+node;
+    if(drawn.has(key))return;
+    drawn.add(key);
     [x,y]=pos(p);
-    let same=0;
-    for(let j=0;j<i;j++){let q=S.p[t][j];if(!q.done&&q.idx>=0&&route(q)[q.idx]===route(p)[p.idx])same++}
-    x+=same*1.35;y-=same*1.35;
+    label=group.map(o=>o.j+1).join('·');
+    moveId=group[0].j;
    }
    let bt=document.createElement('button');
-   bt.className='piece '+(t?'blue':'red');bt.textContent=i+1;
+   bt.className='piece '+(t?'blue':'red');bt.textContent=label;
+   if(label.length>1){bt.style.width=Math.max(34,18+label.length*10)+'px';bt.style.borderRadius='18px';bt.style.padding='0 6px'}
    bt.style.left=x+'%';bt.style.top=y+'%';
    let can=S.n!==null&&t===S.turn&&(!ai||t===0)&&!(S.n===-1&&p.idx<0)&&(p.idx>=0||i===firstWaiting);
-   if(can){bt.classList.add('sel');bt.onclick=()=>move(t,i)}
+   if(can){bt.classList.add('sel');bt.onclick=()=>move(t,moveId)}
    elBoard.appendChild(bt);
   });
  }
@@ -115,7 +122,19 @@ function move(t,id){
  finishTurn(caught)
 }
 function throwYut(){if(S.n!==null||S.over){if(S.over)reset();return}elThrow.disabled=true;let sticks=[...document.querySelectorAll('.stick')];sticks.forEach(x=>x.classList.add('toss'));setTimeout(()=>{let convex=sticks.map(()=>Math.random()<.5);sticks.forEach((x,i)=>{x.classList.remove('toss');x.classList.toggle('convex',convex[i])});let flat=convex.filter(x=>!x).length;let backdo=(flat===1 && !convex[0]);let n=backdo?-1:(flat===0?5:flat),names={[-1]:'백도',1:'도',2:'개',3:'걸',4:'윷',5:'모'};S.n=n;S.extra=n>=4;elResult.textContent=names[n]+'! '+(n>0?'+'+n:'-1');let movable=S.p[S.turn].some(p=>!p.done&&!(n===-1&&p.idx<0));if(!movable){S.n=null;S.extra=false;S.turn=1-S.turn;elThrow.disabled=false;elMsg.textContent='백도로 움직일 말이 없어 차례가 넘어갑니다.';render();if(ai&&S.turn===1)setTimeout(throwYut,600);return}if(ai&&S.turn===1){elMsg.textContent='상대팀이 생각 중...';setTimeout(aiMove,550)}else{elMsg.textContent='노란 테두리가 있는 말을 눌러주세요.';render()}},450)}
-function aiMove(){let a=S.p[1].filter(p=>!p.done&&!(S.n===-1&&p.idx<0));let p=a[Math.floor(Math.random()*a.length)];move(1,p.id)}
+function aiMove(){
+ if(!ai||S.turn!==1||S.n===null||S.over)return;
+ let candidates=S.p[1].map((p,i)=>({p,i})).filter(o=>!o.p.done&&!(S.n===-1&&o.p.idx<0));
+ if(S.n!==-1){
+  let firstWaiting=S.p[1].findIndex(p=>!p.done&&p.idx<0);
+  candidates=candidates.filter(o=>o.p.idx>=0||o.i===firstWaiting);
+ }
+ if(!candidates.length){
+  S.n=null;S.extra=false;S.turn=0;elThrow.disabled=false;elMsg.textContent='상대팀이 움직일 말이 없어 우리팀 차례입니다.';render();return;
+ }
+ let chosen=candidates[Math.floor(Math.random()*candidates.length)];
+ move(1,chosen.i);
+}
 elThrow.onclick=throwYut;
 elAi.onclick=()=>{ai=true;elAi.classList.add('on');elTwo.classList.remove('on');reset()}
 elTwo.onclick=()=>{ai=false;elAi.classList.remove('on');elTwo.classList.add('on');reset()}
